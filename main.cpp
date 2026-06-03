@@ -8,7 +8,11 @@
 // Identitas Plugin AML
 MYMOD(com.username.sa.gles3loader, GTASA_ShaderLoader30, 1.0, Username)
 
-// Deklarasi fungsi dari texture_loader.cpp agar bisa dipakai di sini jika dibutuhkan
+// Mengaktifkan logger bawaan AML agar variabel 'logger' bisa dikenali
+BEGIN_DEPLIST()
+END_DEPLIST()
+
+// Deklarasi fungsi dari texture_loader.cpp
 extern GLuint LoadPNGFromStorage(const char* path);
 
 // --- HOOK EGL CONTEXT (FOR GLES 3.0) ---
@@ -49,11 +53,9 @@ std::string UpgradeShaderToGLSL3(const std::string& originalSource, int shaderTy
     std::stringstream ss(originalSource);
     
     while (std::getline(ss, line)) {
-        // Abaikan presisi bawaan lama agar tidak bentrok
         if (line.find("precision ") != std::string::npos) continue;
         
-        // Konversi sintaks Vertex Shader (Tipe 0x8B31 = GL_VERTEX_SHADER)
-        if (shaderType == 0x8B31) {
+        if (shaderType == 0x8B31) { // Vertex Shader
             if (line.find("attribute ") != std::string::npos) {
                 size_t pos = line.find("attribute ");
                 line.replace(pos, 10, "in ");
@@ -63,13 +65,11 @@ std::string UpgradeShaderToGLSL3(const std::string& originalSource, int shaderTy
                 line.replace(pos, 8, "out ");
             }
         } 
-        // Konversi sintaks Fragment Shader (Tipe 0x8B30 = GL_FRAGMENT_SHADER)
-        else if (shaderType == 0x8B30) {
+        else if (shaderType == 0x8B30) { // Fragment Shader
             if (line.find("varying ") != std::string::npos) {
                 size_t pos = line.find("varying ");
                 line.replace(pos, 8, "in ");
             }
-            // Di GLSL 3, gl_FragColor didepak. Kita ganti dengan out variabel kustom
             if (line.find("gl_FragColor") != std::string::npos) {
                 size_t pos;
                 while ((pos = line.find("gl_FragColor")) != std::string::npos) {
@@ -78,7 +78,6 @@ std::string UpgradeShaderToGLSL3(const std::string& originalSource, int shaderTy
             }
         }
 
-        // Konversi fungsi pembacaan tekstur lama ke fungsi modern 'texture'
         size_t texPos;
         while ((texPos = line.find("texture2D")) != std::string::npos) {
             line.replace(texPos, 9, "texture");
@@ -87,7 +86,6 @@ std::string UpgradeShaderToGLSL3(const std::string& originalSource, int shaderTy
         upgraded += line + "\n";
     }
 
-    // Tambahkan deklarasi output warna di Fragment Shader jika mendeteksi fragOutColor
     if (shaderType == 0x8B30 && upgraded.find("fragOutColor") != std::string::npos) {
         size_t insertPos = upgraded.find("\n", upgraded.find("#version 300 es"));
         upgraded.insert(insertPos + 1, "out vec4 fragOutColor;\n");
@@ -101,24 +99,18 @@ void* (*orig_rwOpenGLShaderCompile)(int shaderType, const char* source);
 void* hook_rwOpenGLShaderCompile(int shaderType, const char* source)
 {
     std::string finalShaderSource;
-    
-    // Tentukan path jika kamu ingin membuat file override kustom di SDCard
-    // Misal: /sdcard/Android/data/com.rockstargames.gtasa/vshader.glsl
     std::string customPath = "/sdcard/Android/data/com.rockstargames.gtasa/";
     customPath += (shaderType == 0x8B31) ? "custom_vshader.glsl" : "custom_fshader.glsl";
 
     std::string externalShader = ReadShaderFile(customPath.c_str());
 
     if (!externalShader.empty()) {
-        // Jika ada file shader kustom di folder game, pakai file itu!
         logger->Info("ShaderLoader: Menggunakan shader luar dari %s", customPath.c_str());
         finalShaderSource = externalShader;
     } else {
-        // Jika tidak ada, pakai shader asli game tapi paksa upgrade ke GLSL versi 3
         finalShaderSource = UpgradeShaderToGLSL3(source, shaderType);
     }
 
-    // Eksekusi fungsi kompilasi asli menggunakan source code baru yang sudah berbasis GLSL 3
     return orig_rwOpenGLShaderCompile(shaderType, finalShaderSource.c_str());
 }
 
@@ -128,11 +120,12 @@ extern "C" void OnModLoad()
     logger->Info("ShaderLoader: Memulai injeksi sistem...");
 
     // 1. Jalankan EGL Hook ke libEGL.so bawaan Android
-    void* libEGL = aml->GetLib("libEGL.so");
+    uintptr_t libEGL = aml->GetLib("libEGL.so"); // Perbaikan: Menggunakan uintptr_t, bukan void*
     if (libEGL) {
-        aml->HookFunc(aml->GetSym(libEGL, "eglCreateContext"), 
-                      (void*)hook_eglCreateContext, 
-                      (void**)&orig_eglCreateContext);
+        // Perbaikan: Menggunakan aml->Hook untuk menimpa fungsi berdasarkan address dari GetSym
+        aml->Hook((void*)aml->GetSym(libEGL, "eglCreateContext"), 
+                  (void*)hook_eglCreateContext, 
+                  (void**)&orig_eglCreateContext);
         logger->Info("ShaderLoader: Jembatan GLES 3.0 siap.");
     }
 
