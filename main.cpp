@@ -6,6 +6,7 @@
 #include <string>
 #include <fstream>
 #include <sstream>
+#include <cstring>
 
 MYMODCFG(com.username.sa.gles3loader, GTASA_ShaderLoader30, 1.0, Username)
 
@@ -84,6 +85,15 @@ uintptr_t hook_rwOpenGLShaderCompile(int shaderType, const char* source)
     return orig_rwOpenGLShaderCompile(shaderType, finalShaderSource.c_str());
 }
 
+void* ScanPattern(uintptr_t base, size_t size, const unsigned char* pattern, size_t patternSize) {
+    for (size_t i = 0; i < size - patternSize; ++i) {
+        if (std::memcmp(reinterpret_cast<void*>(base + i), pattern, patternSize) == 0) {
+            return reinterpret_cast<void*>(base + i);
+        }
+    }
+    return nullptr;
+}
+
 extern "C" void OnModLoad()
 {
     logger->SetTag("ShaderLoader30");
@@ -104,7 +114,8 @@ extern "C" void OnModLoad()
         }
 
         if (!shaderCompileSym) {
-            shaderCompileSym = aml->FindPattern(pGameLibrary, "2D E4 2D E9 24 00 9F E5 10 40 2D E9 05 40 A0 E1 00 50 A0 E1");
+            unsigned char pattern[] = { 0x2D, 0xE4, 0x2D, 0xE9, 0x24, 0x00, 0x9F, 0xE5, 0x10, 0x40, 0x2D, 0xE9, 0x05, 0x40, 0xA0, 0xE1, 0x00, 0x50, 0xA0, 0xE1 };
+            shaderCompileSym = ScanPattern(pGameLibrary, 0x400000, pattern, sizeof(pattern));
         }
 
         if (shaderCompileSym) {
