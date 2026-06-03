@@ -1,22 +1,24 @@
 LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
+LOCAL_CPP_EXTENSION := .cpp .cc
 
+# Nama file .so yang akan dihasilkan nanti
 LOCAL_MODULE    := GTASA_ShaderLoader30
 
-# MENGGUNAKAN WILDCARD:
-# Perintah ini akan otomatis menyapu dan mendaftarkan SEMUA file .cpp 
-# yang ada di folder root maupun di dalam folder mod/ tanpa ada yang terlewat.
-FILE_LIST := $(wildcard $(LOCAL_PATH)/*.cpp) \
-             $(wildcard $(LOCAL_PATH)/mod/*.cpp) \
-             $(wildcard $(LOCAL_PATH)/mod/clubman/*.cpp)
+# Daftarkan file bawaan template DAN file kustom kita (texture_loader.cpp)
+LOCAL_SRC_FILES := main.cpp \
+                   mod/logger.cpp \
+                   mod/config.cpp \
+                   mod/texture_loader.cpp
 
-LOCAL_SRC_FILES := $(FILE_LIST:$(LOCAL_PATH)/%=%)
+# Flag optimasi bawaan template, menggunakan standar C++17
+LOCAL_CFLAGS += -O3 -mfloat-abi=softfp -DNDEBUG -std=c++17
 
-# Include path diarahkan ke root agar format <mod/amlmod.h> terbaca
-LOCAL_C_INCLUDES := $(LOCAL_PATH)
+# Tetap gunakan folder include bawaan template untuk mencari header amlmod.h dkk
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/include
 
-LOCAL_LDLIBS    := -llog -lEGL -lGLESv3
-LOCAL_CFLAGS    := -O3 -std=c++17
+# WAJIB TAMBAH: Hubungkan library grafis EGL dan OpenGL ES 3 (-lEGL -lGLESv3)
+LOCAL_LDLIBS += -llog -lEGL -lGLESv3
 
 include $(BUILD_SHARED_LIBRARY)
