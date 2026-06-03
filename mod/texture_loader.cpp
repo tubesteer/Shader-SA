@@ -3,8 +3,12 @@
 
 #include <GLES3/gl3.h>
 #include "amlmod.h"
+#include "logger.h" // Pastikan include header logger bawaan template
 
-// Fungsi ini yang akan kita panggil nanti untuk memasukkan gambar PNG ke dalam game
+// KUNCI PERBAIKAN: Beritahu compiler bahwa objek 'logger' dideklarasikan di logger.cpp
+extern Logger* logger;
+
+// Fungsi untuk memuat gambar PNG dari storage ke OpenGL ES 3.0
 GLuint LoadPNGFromStorage(const char* path) {
     int width, height, channels;
     
