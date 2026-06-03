@@ -10,17 +10,19 @@ MYMODCFG(com.username.sa.offsetdumper, GTASA_OffsetDumper, 1.0, Username)
 
 uintptr_t pGameLibrary = 0;
 
-void* ScanPattern(uintptr_t base, size_t size, const unsigned char* pattern, size_t patternSize) {
+void* SafeScanPattern(uintptr_t base, size_t size, const unsigned char* pattern, size_t patternSize) {
     for (size_t i = 0; i < size - patternSize; ++i) {
-        if (std::memcmp(reinterpret_cast<void*>(base + i), pattern, patternSize) == 0) {
-            return reinterpret_cast<void*>(base + i);
+        if (*(unsigned char*)(base + i) == pattern[0]) {
+            if (std::memcmp(reinterpret_cast<void*>(base + i), pattern, patternSize) == 0) {
+                return reinterpret_cast<void*>(base + i);
+            }
         }
     }
     return nullptr;
 }
 
 void DumpOffsets() {
-    std::this_thread::sleep_for(std::chrono::seconds(2));
+    std::this_thread::sleep_for(std::chrono::seconds(3));
 
     std::ofstream outFile("/sdcard/offset.txt");
     if (!outFile.is_open()) {
@@ -49,7 +51,7 @@ void DumpOffsets() {
     }
 
     unsigned char pattern[] = { 0x2D, 0xE4, 0x2D, 0xE9, 0x24, 0x00, 0x9F, 0xE5, 0x10, 0x40, 0x2D, 0xE9, 0x05, 0x40, 0xA0, 0xE1, 0x00, 0x50, 0xA0, 0xE1 };
-    void* patResult = ScanPattern(pGameLibrary, 0x800000, pattern, sizeof(pattern));
+    void* patResult = SafeScanPattern(pGameLibrary, 0x300000, pattern, sizeof(pattern));
     if (patResult) {
         uintptr_t offset = (uintptr_t)patResult - pGameLibrary;
         outFile << "rwOpenGLShaderCompile (Pattern Scan) Offset: 0x" << std::hex << offset << "\n";
@@ -71,4 +73,3 @@ extern "C" void OnModLoad()
         dumperThread.detach();
     }
 }
-
