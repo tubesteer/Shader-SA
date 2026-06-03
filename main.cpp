@@ -4,6 +4,7 @@
 #include <string>
 #include <fstream>
 #include <cstring>
+#include <thread>
 
 MYMODCFG(com.username.sa.offsetdumper, GTASA_OffsetDumper, 1.0, Username)
 
@@ -19,6 +20,8 @@ void* ScanPattern(uintptr_t base, size_t size, const unsigned char* pattern, siz
 }
 
 void DumpOffsets() {
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+
     std::ofstream outFile("/sdcard/Android/data/com.rockstargames.gtasa/offset.txt");
     if (!outFile.is_open()) return;
 
@@ -60,6 +63,7 @@ extern "C" void OnModLoad()
     pGameLibrary = aml->GetLib("libGTASA.so");
     
     if (pGameLibrary) {
-        DumpOffsets();
+        std::thread dumperThread(DumpOffsets);
+        dumperThread.detach();
     }
 }
