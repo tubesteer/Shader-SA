@@ -10,19 +10,18 @@ MYMODCFG(com.username.sa.offsetdumper, GTASA_OffsetDumper, 1.0, Username)
 
 uintptr_t pGameLibrary = 0;
 
-void* SafeScanPattern(uintptr_t base, size_t size, const unsigned char* pattern, size_t patternSize) {
-    for (size_t i = 0; i < size - patternSize; ++i) {
-        if (*(unsigned char*)(base + i) == pattern[0]) {
-            if (std::memcmp(reinterpret_cast<void*>(base + i), pattern, patternSize) == 0) {
-                return reinterpret_cast<void*>(base + i);
-            }
+void* ScanMemoryForString(uintptr_t base, size_t size, const char* str) {
+    size_t len = std::strlen(str);
+    for (size_t i = 0; i < size - len; ++i) {
+        if (std::memcmp(reinterpret_cast<void*>(base + i), str, len) == 0) {
+            return reinterpret_cast<void*>(base + i);
         }
     }
     return nullptr;
 }
 
 void DumpOffsets() {
-    std::this_thread::sleep_for(std::chrono::seconds(3));
+    std::this_thread::sleep_for(std::chrono::seconds(4));
 
     std::ofstream outFile("/sdcard/offset.txt");
     if (!outFile.is_open()) {
@@ -31,32 +30,23 @@ void DumpOffsets() {
     
     if (!outFile.is_open()) return;
 
-    outFile << "=== GTA SA OFFSET DUMPER RESULT ===\n";
+    outFile << "=== GTA SA STRING SCANNER RESULT ===\n";
     outFile << "Base Address libGTASA.so: 0x" << std::hex << pGameLibrary << "\n\n";
 
-    void* sym1 = (void*)aml->GetSym(pGameLibrary, "_Z21rwOpenGLShaderCompileP14RwShaderSourcePKc");
-    if (sym1) {
-        uintptr_t offset = (uintptr_t)sym1 - pGameLibrary;
-        outFile << "rwOpenGLShaderCompile (Sym1) Offset: 0x" << std::hex << offset << "\n";
+    void* strVertex = ScanMemoryForString(pGameLibrary, 0x600000, "Vertex shader compile failed:");
+    if (strVertex) {
+        uintptr_t offset = (uintptr_t)strVertex - pGameLibrary;
+        outFile << "String 'Vertex shader compile failed:' Offset: 0x" << std::hex << offset << "\n";
     } else {
-        outFile << "rwOpenGLShaderCompile (Sym1): NOT FOUND\n";
+        outFile << "String 'Vertex shader compile failed:': NOT FOUND\n";
     }
 
-    void* sym2 = (void*)aml->GetSym(pGameLibrary, "_Z21rwOpenGLShaderCompilejPKc");
-    if (sym2) {
-        uintptr_t offset = (uintptr_t)sym2 - pGameLibrary;
-        outFile << "rwOpenGLShaderCompile (Sym2) Offset: 0x" << std::hex << offset << "\n";
+    void* strFragment = ScanMemoryForString(pGameLibrary, 0x600000, "Fragment shader compile failed:");
+    if (strFragment) {
+        uintptr_t offset = (uintptr_t)strFragment - pGameLibrary;
+        outFile << "String 'Fragment shader compile failed:' Offset: 0x" << std::hex << offset << "\n";
     } else {
-        outFile << "rwOpenGLShaderCompile (Sym2): NOT FOUND\n";
-    }
-
-    unsigned char pattern[] = { 0x2D, 0xE4, 0x2D, 0xE9, 0x24, 0x00, 0x9F, 0xE5, 0x10, 0x40, 0x2D, 0xE9, 0x05, 0x40, 0xA0, 0xE1, 0x00, 0x50, 0xA0, 0xE1 };
-    void* patResult = SafeScanPattern(pGameLibrary, 0x300000, pattern, sizeof(pattern));
-    if (patResult) {
-        uintptr_t offset = (uintptr_t)patResult - pGameLibrary;
-        outFile << "rwOpenGLShaderCompile (Pattern Scan) Offset: 0x" << std::hex << offset << "\n";
-    } else {
-        outFile << "rwOpenGLShaderCompile (Pattern Scan): NOT FOUND\n";
+        outFile << "String 'Fragment shader compile failed:': NOT FOUND\n";
     }
 
     outFile << "\n=== END OF DUMP ===\n";
