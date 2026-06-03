@@ -8,8 +8,8 @@
 // Identitas Plugin AML
 MYMOD(com.username.sa.gles3loader, GTASA_ShaderLoader30, 1.0, Username)
 
-// KUNCI PERBAIKAN: Membuat dan menginstansiasi objek logger agar bisa digunakan di seluruh file
-ILogger* logger = new Logger((char*)"GTASA_ShaderLoader30");
+// KUNCI JAWABAN: Beritahu compiler bahwa objek 'logger' dideklarasikan di logger.cpp
+extern Logger* logger;
 
 // Deklarasi fungsi dari texture_loader.cpp
 extern GLuint LoadPNGFromStorage(const char* path);
@@ -116,6 +116,9 @@ void* hook_rwOpenGLShaderCompile(int shaderType, const char* source)
 // --- ENTRY POINT PLUGIN ---
 extern "C" void OnModLoad()
 {
+    // Mengubah tag nama log khusus untuk plugin ini agar tidak bentrok dengan mod lain
+    logger->SetTag("ShaderLoader30");
+    
     logger->Info("ShaderLoader: Memulai injeksi sistem...");
 
     // 1. Jalankan EGL Hook ke libEGL.so bawaan Android
@@ -142,4 +145,3 @@ extern "C" void OnModLoad()
         logger->Error("ShaderLoader: libGTASA.so tidak terdeteksi. Pastikan versi game 2.00!");
     }
 }
-
