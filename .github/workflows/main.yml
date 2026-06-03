@@ -1,0 +1,35 @@
+name: Build AML Shader Loader
+
+on:
+  push:
+    branches: [ "main", "master" ] # Berjalan otomatis saat kamu push ke branch main atau master
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch: # Memungkinkan kamu menjalankan build secara manual dari web GitHub
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Mengambil kode dari repositori kamu ke server GitHub
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    # 2. Menginstall Android NDK di server GitHub
+    - name: Setup Android NDK
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r25c # Versi NDK yang stabil dan sangat cocok untuk target armeabi-v7a
+
+    # 3. Menjalankan proses compile menggunakan ndk-build
+    - name: Compile Plugin with ndk-build
+      run: |
+        ndk-build NDK_PROJECT_PATH=. NDK_APPLICATION_MK=Application.mk APP_BUILD_SCRIPT=Android.mk
+
+    # 4. Membungkus hasil compile (.so) dan mengunggahnya agar bisa di-download
+    - name: Upload Compiled Plugin Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: GTASA_ShaderLoader30_v2.00
+        path: libs/armeabi-v7a/libGTASA_ShaderLoader30.so
