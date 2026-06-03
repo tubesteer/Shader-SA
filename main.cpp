@@ -1,18 +1,19 @@
-#include "mod/amlmod.h"
+#include <mod/amlmod.h>
+#include <mod/logger.h>
+#include <mod/config.h>
 #include <EGL/egl.h>
 #include <GLES3/gl3.h>
 #include <string>
 #include <fstream>
 #include <sstream>
 
-// Identitas Plugin AML
-MYMOD(com.username.sa.gles3loader, GTASA_ShaderLoader30, 1.0, Username)
+// Menggunakan makro konfigurasi bawaan template RusJJ
+MYMODCFG(com.username.sa.gles3loader, GTASA_ShaderLoader30, 1.0, Username)
 
-// KUNCI JAWABAN: Beritahu compiler bahwa objek 'logger' dideklarasikan di logger.cpp
-extern Logger* logger;
-
-// Deklarasi fungsi dari texture_loader.cpp
+// Mengambil fungsi dari texture_loader.cpp jika nanti dibutuhkan
 extern GLuint LoadPNGFromStorage(const char* path);
+
+uintptr_t pGameLibrary = 0;
 
 // --- HOOK EGL CONTEXT (FOR GLES 3.0) ---
 EGLContext (*orig_eglCreateContext)(EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list);
@@ -116,9 +117,8 @@ void* hook_rwOpenGLShaderCompile(int shaderType, const char* source)
 // --- ENTRY POINT PLUGIN ---
 extern "C" void OnModLoad()
 {
-    // Mengubah tag nama log khusus untuk plugin ini agar tidak bentrok dengan mod lain
+    // Mengatur nama tag log khusus sesuai template
     logger->SetTag("ShaderLoader30");
-    
     logger->Info("ShaderLoader: Memulai injeksi sistem...");
 
     // 1. Jalankan EGL Hook ke libEGL.so bawaan Android
@@ -131,17 +131,24 @@ extern "C" void OnModLoad()
     }
 
     // 2. Jalankan Shader Compiler Hook ke libGTASA.so v2.00
-    uintptr_t libBase = aml->GetLib("libGTASA.so");
-    if (libBase) {
-        logger->Info("ShaderLoader: Target libGTASA.so v2.00 ditemukan.");
+    pGameLibrary = aml->GetLib("libGTASA.so");
+    if (pGameLibrary)
+    {
+        logger->Info("ShaderLoader: Target libGTASA.so v2.00 ditemukan!");
         
         // Hook fungsi internal kompilasi shader (Offset: 0x1BD150)
-        aml->Hook((void*)(libBase + 0x1BD150), 
+        aml->Hook((void*)(pGameLibrary + 0x1BD150), 
                   (void*)hook_rwOpenGLShaderCompile, 
                   (void**)&orig_rwOpenGLShaderCompile);
                   
         logger->Info("ShaderLoader: Semua fungsi grafis berhasil di-hook!");
-    } else {
-        logger->Error("ShaderLoader: libGTASA.so tidak terdeteksi. Pastikan versi game 2.00!");
     }
+    else
+    {
+        logger->Error("ShaderLoader: libGTASA.so tidak terdeteksi. Pastikan versi game 2.00!");
+        return;
+    }
+
+    // Simpan konfigurasi otomatis bawaan template jika ada perubahan
+    cfg->Save();
 }
