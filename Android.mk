@@ -2,21 +2,21 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-# Nama plugin .so yang akan dihasilkan (libGTASA_ShaderLoader30.so)
 LOCAL_MODULE    := GTASA_ShaderLoader30
 
-# Daftarkan semua file C++ yang akan di-compile
-# main.cpp di root, dan texture_loader.cpp di dalam folder mod
-LOCAL_SRC_FILES := main.cpp \
-                   mod/texture_loader.cpp
+# MENGGUNAKAN WILDCARD:
+# Perintah ini akan otomatis menyapu dan mendaftarkan SEMUA file .cpp 
+# yang ada di folder root maupun di dalam folder mod/ tanpa ada yang terlewat.
+FILE_LIST := $(wildcard $(LOCAL_PATH)/*.cpp) \
+             $(wildcard $(LOCAL_PATH)/mod/*.cpp) \
+             $(wildcard $(LOCAL_PATH)/mod/clubman/*.cpp)
 
-# Beritahu compiler untuk mencari file header (.h) di dalam folder mod
-LOCAL_C_INCLUDES := $(LOCAL_PATH)/mod
+LOCAL_SRC_FILES := $(FILE_LIST:$(LOCAL_PATH)/%=%)
 
-# Hubungkan library bawaan Android: Log sistem, Android EGL, dan OpenGL ES 3
+# Include path diarahkan ke root agar format <mod/amlmod.h> terbaca
+LOCAL_C_INCLUDES := $(LOCAL_PATH)
+
 LOCAL_LDLIBS    := -llog -lEGL -lGLESv3
-
-# Flag tambahan: Menggunakan standar C++17 dan optimasi performa tingkat tinggi (O3)
 LOCAL_CFLAGS    := -O3 -std=c++17
 
 include $(BUILD_SHARED_LIBRARY)
