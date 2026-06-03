@@ -7,6 +7,11 @@
 #include <fstream>
 #include <sstream>
 #include <cstring>
+#include <android/log.h>
+
+#define LOG_TAG "SHADER_DEBUG"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 MYMODCFG(com.username.sa.gles3loader, GTASA_ShaderLoader30, 1.0, Username)
 
@@ -16,14 +21,16 @@ uintptr_t pGameLibrary = 0;
 EGLContext (*orig_eglCreateContext)(EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list);
 EGLContext hook_eglCreateContext(EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list)
 {
+    LOGI("Memasuki eglCreateContext...");
     EGLint gles3_attribs[] = {
         0x3098, 3, 
         EGL_NONE
     };
     EGLContext context = orig_eglCreateContext(dpy, config, share_context, gles3_attribs);
     if (context != EGL_NO_CONTEXT) {
-        logger->Info("ShaderLoader: OpenGL ES 3.0 Context Created.");
+        LOGI("OpenGL ES 3.0 Context BERHASIL Dibuat.");
     } else {
+        LOGE("OpenGL ES 3.0 Context GAGAL, menggunakan default.");
         context = orig_eglCreateContext(dpy, config, share_context, attrib_list);
     }
     return context;
@@ -70,6 +77,7 @@ std::string UpgradeShaderToGLSL3(const std::string& originalSource, int shaderTy
 uintptr_t (*orig_rwOpenGLShaderCompile)(int shaderType, const char* source);
 uintptr_t hook_rwOpenGLShaderCompile(int shaderType, const char* source)
 {
+    LOGI("Mencegat kompilasi shader tipe: %d", shaderType);
     std::string finalShaderSource;
     std::string customPath = "/sdcard/Android/data/com.rockstargames.gtasa/";
     customPath += (shaderType == 0x8B31) ? "custom_vshader.glsl" : "custom_fshader.glsl";
@@ -77,6 +85,7 @@ uintptr_t hook_rwOpenGLShaderCompile(int shaderType, const char* source)
     std::string externalShader = ReadShaderFile(customPath.c_str());
 
     if (!externalShader.empty()) {
+        LOGI("Menggunakan file shader luar dari storage.");
         finalShaderSource = externalShader;
     } else {
         finalShaderSource = UpgradeShaderToGLSL3(source, shaderType);
@@ -97,34 +106,39 @@ void* ScanPattern(uintptr_t base, size_t size, const unsigned char* pattern, siz
 extern "C" void OnModLoad()
 {
     logger->SetTag("ShaderLoader30");
+    LOGI("Mod ShaderLoader30 Dimuat!");
 
     uintptr_t libEGL = aml->GetLib("libEGL.so");
     if (libEGL) {
         aml->Hook((void*)aml->GetSym(libEGL, "eglCreateContext"), 
                   (void*)hook_eglCreateContext, 
                   (void**)&orig_eglCreateContext);
+        LOGI("Hook eglCreateContext berhasil dipasang.");
     }
 
     pGameLibrary = aml->GetLib("libGTASA.so");
     if (pGameLibrary)
     {
+        LOGI("Mencari simbol fungsi shader...");
         void* shaderCompileSym = (void*)aml->GetSym(pGameLibrary, "_Z21rwOpenGLShaderCompileP14RwShaderSourcePKc");
         if (!shaderCompileSym) {
             shaderCompileSym = (void*)aml->GetSym(pGameLibrary, "_Z21rwOpenGLShaderCompilejPKc");
         }
 
         if (!shaderCompileSym) {
+            LOGI("Simbol tidak ketemu, memindai memori via pattern...");
             unsigned char pattern[] = { 0x2D, 0xE4, 0x2D, 0xE9, 0x24, 0x00, 0x9F, 0xE5, 0x10, 0x40, 0x2D, 0xE9, 0x05, 0x40, 0xA0, 0xE1, 0x00, 0x50, 0xA0, 0xE1 };
-            shaderCompileSym = ScanPattern(pGameLibrary, 0x400000, pattern, sizeof(pattern));
+            shaderCompileSym = ScanPattern(pGameLibrary, 0x500000, pattern, sizeof(pattern));
         }
 
         if (shaderCompileSym) {
+            LOGI("Target fungsi DITEMUKAN di alamat %p. Memasang Hook...", shaderCompileSym);
             aml->Hook(shaderCompileSym, 
                       (void*)hook_rwOpenGLShaderCompile, 
                       (void**)&orig_rwOpenGLShaderCompile);
-            logger->Info("ShaderLoader: Hooked successfully via dynamic detection.");
+            LOGI("Hook shader compiler sukses!");
         } else {
-            logger->Error("ShaderLoader: Failed to find target function.");
+            LOGE("Kritis: Fungsi shader compiler tidak dapat ditemukan di APK ini!");
         }
     }
 
