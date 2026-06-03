@@ -22,7 +22,11 @@ void* ScanPattern(uintptr_t base, size_t size, const unsigned char* pattern, siz
 void DumpOffsets() {
     std::this_thread::sleep_for(std::chrono::seconds(2));
 
-    std::ofstream outFile("/sdcard/Android/data/com.rockstargames.gtasa/offset.txt");
+    std::ofstream outFile("/sdcard/offset.txt");
+    if (!outFile.is_open()) {
+        outFile.open("/storage/emulated/0/offset.txt");
+    }
+    
     if (!outFile.is_open()) return;
 
     outFile << "=== GTA SA OFFSET DUMPER RESULT ===\n";
@@ -67,3 +71,4 @@ extern "C" void OnModLoad()
         dumperThread.detach();
     }
 }
+
