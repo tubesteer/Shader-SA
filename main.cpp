@@ -99,24 +99,22 @@ extern "C" void OnModLoad()
     if (pGameLibrary)
     {
         void* shaderCompileSym = (void*)aml->GetSym(pGameLibrary, "_Z21rwOpenGLShaderCompileP14RwShaderSourcePKc");
-        
         if (!shaderCompileSym) {
             shaderCompileSym = (void*)aml->GetSym(pGameLibrary, "_Z21rwOpenGLShaderCompilejPKc");
+        }
+
+        if (!shaderCompileSym) {
+            shaderCompileSym = aml->FindPattern(pGameLibrary, "2D E4 2D E9 24 00 9F E5 10 40 2D E9 05 40 A0 E1 00 50 A0 E1");
         }
 
         if (shaderCompileSym) {
             aml->Hook(shaderCompileSym, 
                       (void*)hook_rwOpenGLShaderCompile, 
                       (void**)&orig_rwOpenGLShaderCompile);
+            logger->Info("ShaderLoader: Hooked successfully via dynamic detection.");
         } else {
-            aml->Hook((void*)(pGameLibrary + 0x1BD150), 
-                      (void*)hook_rwOpenGLShaderCompile, 
-                      (void**)&orig_rwOpenGLShaderCompile);
+            logger->Error("ShaderLoader: Failed to find target function.");
         }
-    }
-    else
-    {
-        return;
     }
 
     cfg->Save();
