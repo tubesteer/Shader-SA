@@ -1,9 +1,21 @@
 #include <mod/amlmod.h>
+
 #include <GLES2/gl2.h>
 #include <dlfcn.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+
+#include <android/log.h>
+
+#define LOG_TAG "ShaderDump"
+
+#define LOGI(...) \
+    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+
+#define LOGE(...) \
+    __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 MYMOD(net.shader.dump, ShaderDump, 1.0, YourName);
 
@@ -23,6 +35,7 @@ static void SaveShader(const char* src)
     mkdir("/sdcard/ShaderDump", 0777);
 
     char path[256];
+
     sprintf(
         path,
         "/sdcard/ShaderDump/shader_%05d.glsl",
@@ -53,7 +66,6 @@ static void Hooked_glShaderSource(
         {
             size_t len = strlen(src);
 
-            // Hindari dump shader kecil/aneh
             if(len > 100)
             {
                 SaveShader(src);
@@ -75,7 +87,7 @@ extern "C" void OnModLoad()
 
     if(!gles)
     {
-        logger->Error("Failed to load libGLESv2.so");
+        LOGE("Failed to load libGLESv2.so");
         return;
     }
 
@@ -83,7 +95,7 @@ extern "C" void OnModLoad()
 
     if(!sym)
     {
-        logger->Error("Failed to find glShaderSource");
+        LOGE("Failed to find glShaderSource");
         return;
     }
 
@@ -93,5 +105,5 @@ extern "C" void OnModLoad()
         (void**)&orig_glShaderSource
     );
 
-    logger->Info("glShaderSource hooked!");
+    LOGI("glShaderSource hooked!");
 }
