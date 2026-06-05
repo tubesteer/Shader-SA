@@ -24,54 +24,48 @@ int ES2Shader_Build_hook(void* _this, const char* pixelSource, const char* verte
         return ES2Shader_Build_orig(_this, pixelSource, vertexSource);
     }
     
-    try {
-        unsigned int pHash = GetShaderHash(pixelSource);
-        unsigned int vHash = GetShaderHash(vertexSource);
+    unsigned int pHash = GetShaderHash(pixelSource);
+    unsigned int vHash = GetShaderHash(vertexSource);
 
-        // Cek cache dulu
-        if (g_ShaderManager->IsCached(pHash, vHash)) {
-            logger->Info("[CACHE HIT] Shader P[%X] V[%X]", pHash, vHash);
-            return ES2Shader_Build_orig(_this, pixelSource, vertexSource);
-        }
-
-        // Coba baca file eksternal
-        std::string rawPixel = g_ShaderManager->ReadShaderFile("P_" + std::to_string(pHash) + ".glsl");
-        std::string rawVertex = g_ShaderManager->ReadShaderFile("V_" + std::to_string(vHash) + ".glsl");
-
-        // Prepare shader untuk GLES 3.0
-        std::string finalPixel = rawPixel.empty() ? 
-                                  pixelSource : 
-                                  g_ShaderManager->PrepareShaderForGLES3(rawPixel, false);
-        std::string finalVertex = rawVertex.empty() ? 
-                                   vertexSource : 
-                                   g_ShaderManager->PrepareShaderForGLES3(rawVertex, true);
-
-        // Log if custom shader digunakan
-        if (!rawPixel.empty()) {
-            if (g_ShaderManager->ValidateShader(rawPixel, false)) {
-                logger->Info("[CUSTOM] Pixel Shader P[%X] loaded dari eksternal", pHash);
-            } else {
-                logger->Warn("[INVALID] Pixel Shader P[%X] validation failed, fallback ke default", pHash);
-                finalPixel = pixelSource;
-            }
-        }
-        
-        if (!rawVertex.empty()) {
-            if (g_ShaderManager->ValidateShader(rawVertex, true)) {
-                logger->Info("[CUSTOM] Vertex Shader V[%X] loaded dari eksternal", vHash);
-            } else {
-                logger->Warn("[INVALID] Vertex Shader V[%X] validation failed, fallback ke default", vHash);
-                finalVertex = vertexSource;
-            }
-        }
-
-        // Call original function dengan shader yang sudah diproses
-        return ES2Shader_Build_orig(_this, finalPixel.c_str(), finalVertex.c_str());
-        
-    } catch (const std::exception& e) {
-        logger->Error("Exception dalam ES2Shader_Build_hook: %s", e.what());
+    // Cek cache dulu
+    if (g_ShaderManager->IsCached(pHash, vHash)) {
+        logger->Info("[CACHE HIT] Shader P[%X] V[%X]", pHash, vHash);
         return ES2Shader_Build_orig(_this, pixelSource, vertexSource);
     }
+
+    // Coba baca file eksternal
+    std::string rawPixel = g_ShaderManager->ReadShaderFile("P_" + std::to_string(pHash) + ".glsl");
+    std::string rawVertex = g_ShaderManager->ReadShaderFile("V_" + std::to_string(vHash) + ".glsl");
+
+    // Prepare shader untuk GLES 3.0
+    std::string finalPixel = rawPixel.empty() ? 
+                              pixelSource : 
+                              g_ShaderManager->PrepareShaderForGLES3(rawPixel, false);
+    std::string finalVertex = rawVertex.empty() ? 
+                               vertexSource : 
+                               g_ShaderManager->PrepareShaderForGLES3(rawVertex, true);
+
+    // Log if custom shader digunakan
+    if (!rawPixel.empty()) {
+        if (g_ShaderManager->ValidateShader(rawPixel, false)) {
+            logger->Info("[CUSTOM] Pixel Shader P[%X] loaded dari eksternal", pHash);
+        } else {
+            logger->Info("[INVALID] Pixel Shader P[%X] validation failed, fallback ke default", pHash);
+            finalPixel = pixelSource;
+        }
+    }
+    
+    if (!rawVertex.empty()) {
+        if (g_ShaderManager->ValidateShader(rawVertex, true)) {
+            logger->Info("[CUSTOM] Vertex Shader V[%X] loaded dari eksternal", vHash);
+        } else {
+            logger->Info("[INVALID] Vertex Shader V[%X] validation failed, fallback ke default", vHash);
+            finalVertex = vertexSource;
+        }
+    }
+
+    // Call original function dengan shader yang sudah diproses
+    return ES2Shader_Build_orig(_this, finalPixel.c_str(), finalVertex.c_str());
 }
 
 // ============ MOD METADATA ============
@@ -125,50 +119,44 @@ extern "C" void OnModLoad() {
               (void*)ES2Shader_Build_hook, 
               (void**)&ES2Shader_Build_orig);
     
-    logger->Info("✓ Hook pada ES2Shader::Build berhasil!");
+    logger->Info("[OK] Hook pada ES2Shader::Build berhasil!");
     
     // ============ GLES3 PATCH (Optional) ============
     if (offsets.initGraphics != 0) {
         logger->Info("Attempting GLES3 patch at offset 0x%zx...", offsets.initGraphics);
         
-        // Patch untuk force OpenGL ES 3.0 (jika diperlukan)
-        // CATATAN: Ini sangat bergantung pada binary layout, bisa berbeda per versi
         uintptr_t initGraphicsAddr = libBase + offsets.initGraphics;
         bool patchSuccess = false;
         
         // Safety: cek max 20 instruksi saja
         for (uintptr_t i = 0; i < 20 && !patchSuccess; i += (offsets.is64bit ? 4 : 2)) {
-            try {
-                if (offsets.is64bit) {
-                    // 64-bit instruction check
-                    uint32_t* currentIns = (uint32_t*)(initGraphicsAddr + i);
-                    // Pattern matching untuk 64-bit ARM
-                    // TODO: Update dengan correct pattern
-                } else {
-                    // 32-bit ARM Thumb instruction check
-                    unsigned short* currentIns = (unsigned short*)(initGraphicsAddr + i);
-                    if (*currentIns == 0x2302) { // MOVS R3, #2
-                        unsigned char gles3_value = 0x03;
-                        aml->Write(initGraphicsAddr + i, (uintptr_t)&gles3_value, 1);
-                        logger->Info("✓ GLES3 patch applied!");
-                        patchSuccess = true;
-                    }
+            if (offsets.is64bit) {
+                // 64-bit instruction check
+                uint32_t* currentIns = (uint32_t*)(initGraphicsAddr + i);
+                // Pattern matching untuk 64-bit ARM
+                // TODO: Update dengan correct pattern
+            } else {
+                // 32-bit ARM Thumb instruction check
+                unsigned short* currentIns = (unsigned short*)(initGraphicsAddr + i);
+                if (*currentIns == 0x2302) { // MOVS R3, #2
+                    unsigned char gles3_value = 0x03;
+                    aml->Write(initGraphicsAddr + i, (uintptr_t)&gles3_value, 1);
+                    logger->Info("[OK] GLES3 patch applied!");
+                    patchSuccess = true;
                 }
-            } catch (...) {
-                continue;
             }
         }
         
         if (!patchSuccess) {
-            logger->Warn("⚠ GLES3 patch tidak diterapkan (instruksi tidak ditemukan)");
+            logger->Info("[SKIP] GLES3 patch tidak diterapkan (instruksi tidak ditemukan)");
         }
     } else {
-        logger->Warn("⚠ initGraphics offset tidak tersedia, skip GLES3 patch");
+        logger->Info("[SKIP] initGraphics offset tidak tersedia, skip GLES3 patch");
     }
     
     logger->Info("=== Shader Loader fully loaded! ===");
-    logger->Info("Shader files harus diletakkan di: /sdcard/Android/data/com.rockstargames.gtasa/files/shaders/");
-    logger->Info("Naming convention: P_<HASH>.glsl dan V_<HASH>.glsl");
+    logger->Info("Shader files: /sdcard/Android/data/com.rockstargames.gtasa/files/shaders/");
+    logger->Info("Format: P_<HASH>.glsl dan V_<HASH>.glsl");
 }
 
 extern "C" void OnModUnload() {
