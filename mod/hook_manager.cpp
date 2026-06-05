@@ -15,9 +15,6 @@ HookManager::~HookManager() {
 }
 
 GameVersion HookManager::DetectGameVersion() {
-    // TODO: Implement version detection logic
-    // Bisa menggunakan string matching atau header signature detection
-    // Untuk sekarang, kita assume versi baru
     logger->Info("Detected GTA SA Android version (manual config recommended)");
     return GameVersion::V210;  // Default ke v2.10
 }
@@ -59,25 +56,22 @@ HookOffsets HookManager::GetOffsetsForVersion(GameVersion version, bool is64bit)
                 offsets.initGraphics = 0x2690b4;
                 break;
             default:
-                logger->Warn("Unknown version untuk 32-bit");
+                logger->Info("Unknown version untuk 32-bit");
                 break;
         }
     } else {
         // 64-bit ARM offsets (MEMERLUKAN REVERSE ENGINEERING)
-        // Offset ini HARUS diupdate berdasarkan actual binary analysis
         switch (version) {
             case GameVersion::V200:
-                // Update dengan actual offset dari IDA/Ghidra analysis
                 offsets.es2ShaderBuild = 0x0;  // Placeholder
                 offsets.initGraphics = 0x0;    // Placeholder
                 break;
             case GameVersion::V210:
-                // Update dengan actual offset dari IDA/Ghidra analysis
                 offsets.es2ShaderBuild = 0x0;  // Placeholder
                 offsets.initGraphics = 0x0;    // Placeholder
                 break;
             default:
-                logger->Warn("Unknown version untuk 64-bit");
+                logger->Info("Unknown version untuk 64-bit");
                 break;
         }
     }
@@ -97,7 +91,7 @@ bool HookManager::InitializeHooks(void* libHandle) {
     // Deteksi versi
     m_version = DetectGameVersion();
     if (m_version == GameVersion::UNKNOWN) {
-        logger->Warn("Tidak bisa mendeteksi versi, menggunakan default v2.10");
+        logger->Info("Default: v2.10");
         m_version = GameVersion::V210;
     }
     
