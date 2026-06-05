@@ -5,7 +5,8 @@
 #include <streambuf>
 #include <algorithm>
 
-ShaderManager* g_ShaderManager = nullptr;
+// Declare extern, don't define here - defined in main.cpp
+extern ShaderManager* g_ShaderManager;
 
 ShaderManager::ShaderManager() : m_cacheIndex(0) {
     memset(m_cache, 0, sizeof(m_cache));
