@@ -3,7 +3,8 @@
 #include "amlmod.h"
 #include <cstring>
 
-HookManager* g_HookManager = nullptr;
+// Declare extern, don't define here - defined in main.cpp
+extern HookManager* g_HookManager;
 
 HookManager::HookManager() 
     : m_version(GameVersion::UNKNOWN), m_isInitialized(false) {
