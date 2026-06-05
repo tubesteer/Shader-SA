@@ -4,7 +4,6 @@
 #include <fstream>
 #include <streambuf>
 #include <algorithm>
-#include <regex>
 
 ShaderManager* g_ShaderManager = nullptr;
 
@@ -19,29 +18,23 @@ ShaderManager::~ShaderManager() {
 std::string ShaderManager::ReadShaderFile(const std::string& filename) {
     std::string path = std::string(aml->GetAndroidDataPath()) + "/shaders/" + filename;
     
-    try {
-        std::ifstream file(path, std::ios::binary);
-        if (!file.is_open()) {
-            logger->Warn("Gagal membuka file shader: %s", path.c_str());
-            return "";
-        }
-        
-        std::string content((std::istreambuf_iterator<char>(file)), 
-                           std::istreambuf_iterator<char>());
-        file.close();
-        
-        if (content.empty()) {
-            logger->Warn("File shader kosong: %s", path.c_str());
-            return "";
-        }
-        
-        logger->Info("Berhasil membaca shader: %s (size: %zu bytes)", 
-                     filename.c_str(), content.size());
-        return content;
-    } catch (const std::exception& e) {
-        logger->Error("Exception saat membaca shader: %s", e.what());
+    std::ifstream file(path, std::ios::binary);
+    if (!file.is_open()) {
+        logger->Info("File shader tidak ditemukan: %s", path.c_str());
         return "";
     }
+    
+    std::string content((std::istreambuf_iterator<char>(file)), 
+                       std::istreambuf_iterator<char>());
+    file.close();
+    
+    if (content.empty()) {
+        logger->Info("File shader kosong: %s", path.c_str());
+        return "";
+    }
+    
+    logger->Info("Membaca shader: %s (%zu bytes)", filename.c_str(), content.size());
+    return content;
 }
 
 bool ShaderManager::ValidateShader(const std::string& source, bool isVertex) {
@@ -49,20 +42,13 @@ bool ShaderManager::ValidateShader(const std::string& source, bool isVertex) {
     
     // Check basic GLSL syntax
     if (source.find("#version") == std::string::npos) {
-        logger->Warn("Shader tidak memiliki directive #version");
+        logger->Info("Shader tanpa directive #version");
         return false;
     }
     
-    if (isVertex) {
-        if (source.find("void main") == std::string::npos) {
-            logger->Warn("Vertex shader tidak memiliki fungsi main()");
-            return false;
-        }
-    } else {
-        if (source.find("void main") == std::string::npos) {
-            logger->Warn("Fragment shader tidak memiliki fungsi main()");
-            return false;
-        }
+    if (source.find("void main") == std::string::npos) {
+        logger->Info("Shader tanpa fungsi main()");
+        return false;
     }
     
     return true;
@@ -80,7 +66,6 @@ std::string ShaderManager::PrepareShaderForGLES3(const std::string& source, bool
             size_t endLine = processed.find("\n", versionPos);
             if (endLine != std::string::npos) {
                 processed.insert(endLine + 1, "precision highp float;\n");
-                logger->Info("Menambahkan precision qualifier untuk fragment shader");
             }
         }
     }
