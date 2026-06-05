@@ -1,5 +1,5 @@
 #include <mod/amlmod.h>
-#include <logger.h>
+#include <mod/logger.h>
 #include <string>
 #include <fstream>
 #include <GLES2/gl2.h>
