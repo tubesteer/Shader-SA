@@ -1,21 +1,15 @@
 #include <mod/amlmod.h>
 #include <mod/logger.h>
+#include <mod/iaml.h> // Menggunakan file iaml.h yang kamu bagikan
 #include <GLES2/gl2.h>
 #include <EGL/egl.h>
 
 // Menyampaikan informasi plugin ke AML
 MYMOD(com.saadox.shader.core, SAAdoxShaderCore, 1.0, SAAdox Team)
 
-// Kita asumsikan target library utama adalah libGTASA.so
 uintptr_t pGameBase = 0;
 int gameVersion = 0;
 
-// Penampung fungsi asli hasil Hooking
-void (*old_glDrawElements)(GLenum mode, GLsizei count, GLenum type, const void* indices) = nullptr;
-void (*old_glDrawArrays)(GLenum mode, GLint first, GLsizei count) = nullptr;
-void* (*old_eglGetProcAddress)(const char* procname) = nullptr;
-
-// Struktur tiruan untuk menampung data kustom (seperti vertex normal/shader coefficient)
 struct SAAdoxConfig {
     float envMapCoefficient = 1.0f;
     bool enableGodRay = true;
@@ -24,71 +18,50 @@ struct SAAdoxConfig {
 } g_Config;
 
 /* ==========================================================================
-   1. LOGIKA RENDER QUEUE TWEAK & GRAPHICS HOOK
+   1. DEKLARASI HOOK MENGGUNAKAN MAKRO BAWAN AML (SINKRON DENGAN iaml.h)
    ========================================================================== */
 
-// Fungsi tiruan dari sub-rutin :init_glTextureBuffer di CLEO
-void InitGLTextureBuffer() {
-    // Implementasi alokasi Tekstur Buffer menggunakan OpenGL Native
-    GLuint texBuffer;
-    glGenTextures(1, &texBuffer);
-    glBindTexture(GL_TEXTURE_2D, texBuffer);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1024, 1024, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-    // Logika tambahan setara perintah CLEO '0@ = 2048 malloc()' dst.
-    logger->Info("SAAdox: GL Texture Buffer Re-initialized.");
-}
-
-// Hooking glDrawElements (Pengganti rutin :RQTweak di CLEO)
-void hook_glDrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices) {
-    // Di sini kamu bisa memanipulasi vertex sebelum digambar (CNormal/FGL_NORMAL logic)
-    // Serta menyisipkan kustom shader koefisien
+// Menggunakan DECL_HOOK agar makro HOOK di bawahnya mengenali 'HookOf_...' secara otomatis
+DECL_HOOK(void, glDrawElements, GLenum mode, GLsizei count, GLenum type, const void* indices)
+{
     if (g_Config.enableGodRay) {
         // Logika injeksi shader uniform parameter untuk GodRay di sini
     }
 
-    // Panggil fungsi render asli agar objek tetap muncul di layar
-    old_glDrawElements(mode, count, type, indices);
+    // Panggil fungsi asli (makro AML otomatis menyediakan pointer fungsi asli di variabel ini)
+    glDrawElements(mode, count, type, indices);
 }
 
-// Hooking eglGetProcAddress untuk menangkap ekstensi driver grafis Android
-void* hook_eglGetProcAddress(const char* procname) {
+DECL_HOOK(void*, eglGetProcAddress, const char* procname)
+{
     // Mengalihkan atau mencatat fungsi driver eksternal jika diperlukan
-    return old_eglGetProcAddress(procname);
+    return eglGetProcAddress(procname);
 }
-
 
 /* ==========================================================================
-   2. PROSES DETEKSI VERSI & DETAILED PATCHING (MEMORY INJECTION)
+   2. LOGIKA RENDER QUEUE TWEAK & GRAPHICS INITIALIZATION
    ========================================================================== */
 
-void ApplyMemoryPatches() {
-    // Deteksi manual berbasis struktur offset yang ada di skrip CLEO kamu
-    // Menggunakan aml->Write untuk mengganti byte biner asli (memprotect otomatis diatur AML)
-    
-    if (gameVersion == 108) { // GTA SA v1.08
-        logger->Info("SAAdox: Applying patches for v1.08");
-        
-        // Contoh translasi: ARM.memprotect2(0x1BCF3C, 0xF8F2F3F7, 4)
-        uint32_t patch_108_1 = 0xF8F2F3F7;
-        aml->Write(pGameBase + 0x1BCF3C, (uintptr_t)&patch_108_1, 4);
-
-        // Contoh menambal alamat fungsi VehicleShader/BuildingShader asli (RQTweak hook)
-        // aml->Hook((void*)(pGameBase + 0x53D280), (void*)hook_glDrawElements, (void**)&old_glDrawElements);
-        
-    } 
-    else if (gameVersion == 200) { // GTA SA v2.00
-        logger->Info("SAAdox: Applying patches for v2.00");
-        
-        uint32_t patch_200_1 = 0xDEADC0DE; // Ganti dengan hex asli v2.00 dari skripmu
-        aml->Write(pGameBase + 0x2BCF3C, (uintptr_t)&patch_200_1, 4);
-    } 
-    else if (gameVersion == 210) { // GTA SA v2.10
-        logger->Info("SAAdox: Applying patches for v2.10");
-        
-        // Logika patching spesifik v2.10
-    }
+void InitGLTextureBuffer() {
+    GLuint texBuffer;
+    glGenTextures(1, &texBuffer);
+    glBindTexture(GL_TEXTURE_2D, texBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1024, 1024, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    logger->Info("SAAdox: GL Texture Buffer Re-initialized.");
 }
 
+void ApplyMemoryPatches() {
+    if (gameVersion == 108) { 
+        logger->Info("SAAdox: Applying patches for v1.08");
+        
+        // Menggunakan makro aml->Write32 bawaan untuk menulis 4 byte hex secara instan
+        aml->Write32(pGameBase + 0x1BCF3C, 0xF8F2F3F7);
+    } 
+    else if (gameVersion == 200) { 
+        logger->Info("SAAdox: Applying patches for v2.00");
+        aml->Write32(pGameBase + 0x2BCF3C, 0xDEADC0DE);
+    } 
+}
 
 /* ==========================================================================
    3. INITIALIZATION (FUNGSI UTAMA SAAT MOD DIMUAT)
@@ -96,40 +69,44 @@ void ApplyMemoryPatches() {
 extern "C" void OnModLoad() {
     logger->Info("SAAdox Native Shader Plugin Loaded!");
 
-    // 1. Ambil base address dari libGTASA.so
-    pGameBase = aml->GetModuleBase("libGTASA.so");
+    // PERBAIKAN 1: Mengganti GetModuleBase menjadi GetLib sesuai baris 81 iaml.h
+    pGameBase = aml->GetLib("libGTASA.so");
     if (!pGameBase) {
         logger->Error("SAAdox: Failed to locate libGTASA.so Base Address!");
         return;
     }
 
-    // 2. Deteksi Versi Game secara dinamis (mengikuti pola pembacaan memori di CLEO)
-    // Kita bisa memeriksa isi library atau menggunakan fungsi bawaan AML jika tersedia
-    // Di sini kita tiru pembacaan byte penanda versi dari skrip kamu:
-    uint32_t versionCheck = *(uint32_t*)(pGameBase + 0x200000); // Ganti dengan offset penanda versimu
+    // Deteksi versi berdasarkan struktur memori game
+    uint32_t versionCheck = aml->Read32(pGameBase + 0x200000); 
     
-    if (versionCheck == 0x108) { // Asumsi penanda byte
+    // PERBAIKAN 2: Mengganti GetModuleBase menjadi GetLib
+    if (versionCheck == 0x108) { 
         gameVersion = 108;
-    } else if (aml->GetModuleBase("libGTASA_200.so") || versionCheck == 0x200) {
+    } else if (aml->GetLib("libGTASA_200.so") || versionCheck == 0x200) {
         gameVersion = 200;
     } else {
-        gameVersion = 210; // Default ke versi terbaru jika tidak cocok
+        gameVersion = 210; 
     }
 
-    // 3. Eksekusi Patching Memori (Menggantikan kode-kode hex panjang di CLEO)
+    // Jalankan patching memori grafis
     ApplyMemoryPatches();
 
-    // 4. Lakukan Hooking ke fungsi Driver Grafis OpenGL (Native & Clean)
-    // AML akan mengurus pengalihan instruksi secara instan tanpa membuat CPU stuttering
-    HOOK(eglGetProcAddress, hook_eglGetProcAddress);
+    // PERBAIKAN 3: Sekarang makro HOOK bekerja sempurna karena eglGetProcAddress dideklarasikan dengan DECL_HOOK
+    // Meng-hook langsung alamat eglGetProcAddress dari library system/game
+    void* eglGPA_addr = aml->GetSym(pGameBase, "eglGetProcAddress");
+    if(eglGPA_addr) {
+        HOOK(eglGetProcAddress, eglGPA_addr);
+    }
     
-    // Kamu bisa menggunakan aml->Hook atau antarmuka inline hook internal bawaan ndk/aml
-    // Mengarahkan fungsi draw agar melewati filter shader SAAdox kita
-    void* glDrawElements_addr = aml->GetRequiredService("glDrawElements"); 
-    // Atau ambil langsung lewat dlsym/eglGetProcAddress
-    aml->Hook((void*)glDrawElements, (void*)hook_glDrawElements, (void**)&old_glDrawElements);
+    // PERBAIKAN 4: Mencari fungsi glDrawElements menggunakan GetSym dari libGTASA.so secara aman
+    void* glDrawElements_addr = aml->GetSym(pGameBase, "glDrawElements"); 
+    if (glDrawElements_addr) {
+        HOOK(glDrawElements, glDrawElements_addr);
+    } else {
+        logger->Error("SAAdox: glDrawElements symbols not found!");
+    }
 
-    // 5. Jalankan inisialisasi tekstur buffer
+    // Inisialisasi buffer
     InitGLTextureBuffer();
     
     logger->Info("SAAdox: Native Hooks successfully attached for version %d.", gameVersion);
