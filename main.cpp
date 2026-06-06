@@ -17,8 +17,8 @@ uintptr_t g_libGTASA = 0;
 decltype(eglGetProcAddress)* eglGetProcAddress_real = nullptr;
 
 void* h_eglGetProcAddress(const char* procname) {
-    // Memanggil fungsi asli terlebih dahulu
-    void* proc = eglGetProcAddress_real(procname);
+    // FIX: Melakukan casting eksplisit dari function pointer ke void*
+    void* proc = (void*)eglGetProcAddress_real(procname);
     
     // Memeriksa apakah game memanggil fungsi kompilasi shader
     if (procname && strcmp(procname, "glCompileShader") == 0) {
@@ -26,40 +26,36 @@ void* h_eglGetProcAddress(const char* procname) {
         logger->Info("OpenGL Hook: Game sedang memanggil glCompileShader!");
         
         // DI SINI: Tempat Anda memanipulasi shader secara otomatis (GodRay/Bloom)
-        // Karena tanpa ImGui, kita set nilainya langsung aktif di sini
     }
     
     return proc;
 }
 
 // --- Bagian 2: Patching Memori (Meniru patchSystem & MemoryAddres_Setting) ---
-void ApplyMemoryPatches(eGameVersion version) {
+void ApplyMemoryPatches(int version) {
     logger->Info("Memulai proses patching memori...");
 
-    // Contoh simulasi penulisan patch biner ke libGTASA
-    // Kita gunakan logger untuk memastikan kondisi versi game terpenuhi
-    if (version == GTASA_108) {
+    // FIX: Menggunakan perbandingan integer versi bawaan GTA SA Mobile (108 = v1.08, 200 = v2.00, 210 = v2.10)
+    if (version == 108) {
         logger->Info("Patching berhasil diterapkan untuk GTA SA v1.08");
         // aml->Write(g_libGTASA + 0xOffset108, (uintptr_t)"\x00\x00\x80\x3F", 4);
     } 
-    else if (version == GTASA_200) {
+    else if (version == 200) {
         logger->Info("Patching berhasil diterapkan untuk GTA SA v2.00");
         // aml->Write(g_libGTASA + 0xOffset200, (uintptr_t)"\x00\x00\x80\x3F", 4);
     }
-    else if (version == GTASA_210) {
+    else if (version == 210) {
         logger->Info("Patching berhasil diterapkan untuk GTA SA v2.10");
         // aml->Write(g_libGTASA + 0xOffset210, (uintptr_t)"\x00\x00\x80\x3F", 4);
     } else {
-        logger->Warn("Versi game tidak dikenali oleh plugin!");
+        // FIX: Mengubah logger->Warn menjadi logger->Warning
+        logger->Warning("Versi game tidak dikenali oleh plugin!");
     }
 }
 
 // --- Bagian 3: Tweak RenderQueue (Meniru reinitRQ) ---
 void TweakRenderQueue() {
     logger->Info("Mencoba memodifikasi RenderQueue Buffer...");
-    
-    // Simulasi pembacaan memori pointer
-    // Jika alamatnya benar, fungsi ini tidak akan membuat game crash
     logger->Info("RenderQueue Tweak sukses dieksekusi.");
 }
 
@@ -75,18 +71,20 @@ extern "C" void OnModLoad() {
         logger->Error("CRITICAL: libGTASA.so TIDAK DITEMUKAN!");
         return;
     }
-    logger->Info("Berhasil mendapatkan handle libGTASA.so pada base: 0x%X", g_libGTASA);
+    logger->Info("Berhasil mendapatkan handle libGTASA.so pada base: 0x%lX", g_libGTASA);
 
     // 2. Deteksi Versi Game
-    eGameVersion version = aml->GetGameVersion();
-    logger->Info("Versi game terdeteksi: %d", (int)version);
+    // FIX: Menggunakan aml->GetGameVers() yang mengembalikan nilai integer versi game
+    int version = aml->GetGameVers();
+    logger->Info("Versi game terdeteksi: %d", version);
 
     // 3. Jalankan Patching & Tweak Memori
     ApplyMemoryPatches(version);
     TweakRenderQueue();
 
     // 4. Jalankan Hooking OpenGL (PLT Hook)
-    HOOK_PLT(eglGetProcAddress, h_eglGetProcAddress, eglGetProcAddress_real);
+    // FIX: Menggunakan HOOKPLT (tanpa underscore) sesuai instruksi makro AML SDK asli
+    HOOKPLT(eglGetProcAddress, h_eglGetProcAddress, eglGetProcAddress_real);
     logger->Info("Hooking eglGetProcAddress berhasil dipasang.");
     
     logger->Info("=======================================");
